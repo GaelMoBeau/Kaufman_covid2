@@ -1,0 +1,79 @@
+---
+title: "Kaufmn_covid2"
+author: "GMB"
+date: "07/12/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(nCal)
+library(factoextra)
+```
+
+2020-12-07 from the Net raw data (background substracted), run nCal on the formated input.
+```{r}
+nCal_input <- read.table("../nCal_input.txt", header = T, sep = "\t", dec = ".")
+
+out.norm = ncal(log(fi)~expected_conc, nCal_input , bcrm.fit=TRUE, bcrm.model="norm", return.fits = TRUE, plot.se.profile=TRUE, control.jags=list(n.iter=1e5), verbose=FALSE)
+fit.norm=attr(out.norm, "fits")
+
+write.table(out.norm, file = "../nCal_output.txt", sep = "\t", row.names = F)
+
+```
+
+reformat in excel and reimport data table
+
+Test inter-batch reproducibility using PCA
+```{r}
+all_samples <- read.table("../sample_conc_anno.txt", header = T, row.names = 1, sep = "\t", )
+round1 <- read.table("../round1_ctrl.txt", header = T, row.names = 1, sep = "\t")
+round1_ctrl <- round1[round1$Origin == "CTRL",]
+round2 <- read.table("../round2_ctrl.txt", header = T, row.names = 1, sep = "\t")
+round2_ctrl <- round2[round2$Origin == "CTRL",]
+combi <- rbind(round1, round2)
+combi_ctrl <- combi[combi$Origin == "CTRL",]
+```
+
+Generate PCA to check plate effect
+```{r}
+df <- prcomp(combi[,c(1,3:29)], center = T, scale. = T)
+CTRL <- rownames(combi[combi$Origin == "CTRL",])
+
+fviz_pca_biplot(df, 
+             #select.ind = list(name = CTRL), 
+                col.var = "contrib", 
+                gradient.cols = c("grey", "blue"), 
+                repel = T, 
+                
+                geom.ind = c("point"),
+                pointshape = 21, pointsize = 2,
+                fill.ind = cut(combi$Round, 2, labels=c('1', '2')), col.ind = "black",
+                addEllipses = T,
+                #ellipse.level = 0.95,
+                ellipse.type = "convex",
+                ellipse.alpha = 0.3,
+                legend.title = list(fill = "Round"),
+                
+                title = "Round 1 vs 2 PCA")
+#xlim(-20,10)+ylim(-10,25)
+fviz_pca_ind(df, 
+                select.ind = list(name = CTRL),
+                repel = T, 
+                habillage = combi$Round,
+                geom.ind = c("point", "text"),
+                pointshape = 21, pointsize = 2,
+                fill.ind = cut(combi$Round, 2, labels=c('1', '2')), col.ind = "black",
+                addEllipses = T,
+                #ellipse.level = 0.95,
+                ellipse.type = "convex",
+                ellipse.alpha = 0.2,
+                legend.title = list(fill = "Round"),
+                
+                title = "Round 1 vs 2 CTRL PCA")
+ggsave(filename = "../figures/PCA_CTRL_round.pdf", height = 4, width = 6)
+
+```
+
