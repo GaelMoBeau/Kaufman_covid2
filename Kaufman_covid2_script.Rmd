@@ -35,14 +35,19 @@ round2 <- read.table("../round2_ctrl.txt", header = T, row.names = 1, sep = "\t"
 round2_ctrl <- round2[round2$Origin == "CTRL",]
 combi <- rbind(round1, round2)
 combi_ctrl <- combi[combi$Origin == "CTRL",]
+
+#Attempt normalization with MDimNormn between batches to check the effect
+norm.combi <- normn_MA(combi[,4:29], expGroup = combi$Round)
+norm.combi <- cbind(combi[,1:3], norm.combi)
 ```
 
 Generate PCA to check plate effect
 ```{r}
 df <- prcomp(combi[,c(1,3:29)], center = T, scale. = T)
 CTRL <- rownames(combi[combi$Origin == "CTRL",])
+df.norm <- prcomp(norm.combi[,-2], center = T, scale. = T)
 
-fviz_pca_biplot(df, 
+fviz_pca_biplot(df.norm, 
              #select.ind = list(name = CTRL), 
                 col.var = "contrib", 
                 gradient.cols = c("grey", "blue"), 
@@ -56,10 +61,10 @@ fviz_pca_biplot(df,
                 ellipse.type = "convex",
                 ellipse.alpha = 0.3,
                 legend.title = list(fill = "Round"),
-                
-                title = "Round 1 vs 2 PCA")
-#xlim(-20,10)+ylim(-10,25)
-fviz_pca_ind(df, 
+                title = "Round 1 vs 2 PCA ROUND-NORMALIZED")#+xlim(-20,10)+ylim(-10,25)
+
+#to compare Control samples between rounds
+fviz_pca_ind(df.norm, 
                 select.ind = list(name = CTRL),
                 repel = T, 
                 habillage = combi$Round,
@@ -71,9 +76,75 @@ fviz_pca_ind(df,
                 ellipse.type = "convex",
                 ellipse.alpha = 0.2,
                 legend.title = list(fill = "Round"),
-                
-                title = "Round 1 vs 2 CTRL PCA")
-ggsave(filename = "../figures/PCA_CTRL_round.pdf", height = 4, width = 6)
+                title = "Round 1 vs 2 CTRL PCA ROUND-NORMALIZED")#+xlim(-20,10)+ylim(-10,25)
+fviz_pca_ind(df.norm, 
+                #select.ind = list(name = CTRL),
+                repel = T, 
+                #habillage = combi$Origin,
+                geom.ind = c("point"),
+                pointshape = 21, pointsize = 2,
+                fill.ind = norm.combi$Origin, col.ind = cut(norm.combi$Round, 2, labels=c('1', '2')),
+                #addEllipses = T,
+                #ellipse.level = 0.95,
+                #ellipse.type = "convex",
+                ellipse.alpha = 0.2,
+                legend.title = list(fill = "Round"),
+                title = "Round 1 vs 2 PCA ROUND-NORMALIZED")#+xlim(-20,10)+ylim(-10,25)
+ggsave(filename = "../figures/PCA_round_NORMALIZED.pdf", height = 4, width = 6)
 
+```
+
+Calculate cytokine score_v1 for this round
+```{r}
+cyto <- all_samples[,17:42]
+cyto.scaled <- as.data.frame(scale(cyto))
+cyto.score <- as.data.frame(rowMeans(cyto.scaled))
+colnames(cyto.score) <- "Norm_cytokine_score"
+all_samples.score <- cbind(all_samples, cyto.score)
+
+#check PCA contribution of cytokine score
+df <- prcomp(all_samples.score[,c(17:43)], center = T, scale. = T)
+fviz_pca_biplot(df,
+                select.var = list(name = c("Norm_cytokine_score")),
+                col.var = "contrib", 
+                gradient.cols = c("blue", "blue"), 
+                repel = T, 
+                
+                geom.ind = c("point"),
+                pointshape = 21, pointsize = 2,
+                fill.ind = all_samples.score$Severity_Sampling_CHUM,
+                addEllipses = T,
+                ellipse.type = "convex",
+                ellipse.alpha = 0.3,
+                legend.title = list(fill = "Origin"),
+                title = "PCA w/ cytoscore_v1")
+ggsave(filename = "../figures/PCA_cytoscore.pdf", height = 4, width = 6)
+```
+
+Recalulate cytokine score for CoV+ samples only
+```{r}
+cyto.cov <- all_samples[all_samples$covid == "positif",17:42]
+cyto.cov.scaled <- as.data.frame(scale(cyto.cov))
+cyto.cov.score <- as.data.frame(rowMeans(cyto.cov.scaled))
+colnames(cyto.cov.score) <- "Norm_cytokine_score"
+all_samples.cov.score <- cbind(all_samples[all_samples$covid == "positif",], cyto.cov.score)
+
+#check PCA contribution of cytokine score
+df <- prcomp(all_samples.cov.score[,c(17:43)], center = T, scale. = T)
+fviz_pca_biplot(df,
+                select.var = list(name = c("Norm_cytokine_score")),
+                col.var = "contrib", 
+                gradient.cols = c("blue", "blue"), 
+                repel = T, 
+                
+                geom.ind = c("point"),
+                pointshape = 21, pointsize = 2,
+                fill.ind = all_samples.cov.score$Severity_Sampling_CHUM,
+                addEllipses = T,
+                ellipse.type = "convex",
+                ellipse.alpha = 0.3,
+                legend.title = list(fill = "Origin"),
+                title = "PCA w/ cytoscore_v1")
+ggsave(filename = "../figures/PCA_cytoscore.pdf", height = 4, width = 6)
 ```
 
